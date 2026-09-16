@@ -1,129 +1,77 @@
-# Gonzales Lab ACCRE Storage
+# Gonzales Lab ACCRE Storage Access Guide
 
-## Windows Access & Setup Guide
+This guide documents the **tested Windows setup** for accessing Gonzales
+Lab ACCRE storage after the AuriStor migration. It includes browser
+access, SSH, passwordless SSH, mounting ACCRE as a persistent Windows
+drive, a desktop shortcut, and the troubleshooting steps that proved
+useful during setup.
 
-The Gonzales Lab's ACCRE storage has been migrated from the old AuriStor
-filesystem to ACCRE's `/data` storage.
+> **Lab storage:** `/data/gonzales_lab`\
+> **Underlying ACCRE path:** `/v5000/data/gonzales_lab`\
+> **Recommended Windows mount:**
+> `\\sshfs.r\YOUR_VUNET_ID@login.accre.vu\data\gonzales_lab`
 
-The new lab storage is located at:
-
-``` text
-/data/gonzales_lab
-```
-
-This is a shortcut to the underlying storage location:
-
-``` text
-/v5000/data/gonzales_lab
-```
-
-**Use `/data/gonzales_lab` for normal access.**
-
-This guide covers:
-
--   Accessing ACCRE through your browser
--   Connecting to ACCRE from Windows with SSH
--   Setting up passwordless SSH
--   Creating an easy `ssh accre` shortcut
--   Mounting the lab storage as a normal Windows drive
--   Disconnecting and reconnecting the drive
--   Basic troubleshooting
+For normal use, use `/data/gonzales_lab`.
 
 ------------------------------------------------------------------------
 
-## 1. Verify Your ACCRE Access
-
-First, make sure your Vanderbilt account has access to ACCRE and the
-Gonzales Lab storage.
+## 1. Confirm ACCRE access
 
 Open the ACCRE Visualization Portal:
 
-<https://viz.accre.vu>
+https://viz.accre.vu
 
-Log in using your **Vanderbilt VUNet ID and password**.
+Log in with your Vanderbilt VUNet ID and password.
 
-Once logged in, select:
-
-**Clusters → ACCRE Shell Access**
-
-This opens a Linux terminal in your browser.
-
-Run:
+Choose **Clusters → ACCRE Shell Access**, then run:
 
 ``` bash
 ls -lah /data/gonzales_lab
 ```
 
-If your account has access, you should see the directories stored in the
-Gonzales Lab space.
+If you have access, you should see the Gonzales Lab directories.
 
-You can navigate into your own directory, if one has been created for
-you:
-
-``` bash
-cd /data/gonzales_lab/YOUR_FOLDER
-```
-
-Then list its contents:
-
-``` bash
-ls -lah
-```
-
-> **If you receive `Permission denied`:** Your Vanderbilt account may
-> not yet be a member of the `gonzales_lab` ACCRE group. Contact the lab
-> administrator/PI or ACCRE support before continuing.
+If you receive `Permission denied`, your Vanderbilt account likely needs
+access to the `gonzales_lab` ACCRE group. Contact the PI/lab
+administrator or ACCRE support.
 
 ------------------------------------------------------------------------
 
-## 2. Connect to ACCRE from Windows
+## 2. Confirm basic SSH access from Windows
 
-Windows includes an SSH client, so additional SSH software usually is
-not necessary.
-
-Open **Windows PowerShell** and run:
+Open **PowerShell as Administrator** and run:
 
 ``` powershell
 ssh YOUR_VUNET_ID@login.accre.vu
 ```
 
-For example:
+Example:
 
 ``` powershell
 ssh woodsdp@login.accre.vu
 ```
 
-The first time you connect from a computer, you may be asked whether you
-trust the server host key. Verify the host/fingerprint according to
-current ACCRE guidance, then accept it if appropriate.
-
-Enter your Vanderbilt password when prompted.
-
-> **Note:** Nothing appears on screen while you type an SSH password.
-> You will not see dots, asterisks, or other characters. This is normal.
-
-After successfully connecting, your prompt will change from something
-resembling:
+On the first connection, Windows may ask:
 
 ``` text
-PS C:\Users\YOUR_USERNAME>
+Are you sure you want to continue connecting (yes/no/[fingerprint])?
 ```
 
-to something resembling:
+Enter:
 
 ``` text
-[YOUR_USERNAME@gw02 ~]$
+yes
 ```
 
-You are now connected to ACCRE.
+Then enter your Vanderbilt password.
 
-Test access to the lab storage:
+Once connected, verify the lab directory:
 
 ``` bash
 ls -lah /data/gonzales_lab
 ```
 
-When finished, disconnect:
+Exit ACCRE:
 
 ``` bash
 exit
@@ -131,14 +79,12 @@ exit
 
 ------------------------------------------------------------------------
 
-## 3. Set Up Passwordless SSH
+## 3. Set up passwordless SSH
 
-Setting up an SSH key makes regular ACCRE access much easier and is
-useful for mounting ACCRE storage as a Windows drive.
+Passwordless SSH is strongly recommended for machines that will
+regularly use ACCRE.
 
-### 3.1 Check for an Existing SSH Key
-
-In Windows PowerShell:
+### 3.1 Check for an existing key
 
 ``` powershell
 Get-ChildItem $env:USERPROFILE\.ssh
@@ -151,85 +97,77 @@ id_ed25519
 id_ed25519.pub
 ```
 
-If these already exist, you may already have an SSH key. **Do not
-overwrite an existing private key unless you know it is safe to do so.**
+If these already exist and are the key you intend to use, skip key
+generation.
 
-### 3.2 Generate a New SSH Key
-
-If you do not already have one:
+### 3.2 Generate a key
 
 ``` powershell
 ssh-keygen -t ed25519
 ```
 
-When asked where to save the key, press **Enter** to accept the default:
+Press **Enter** to accept the default location:
 
 ``` text
 C:\Users\YOUR_WINDOWS_USERNAME\.ssh\id_ed25519
 ```
 
-For the convenient automatic-mount setup described here, leave the
-passphrase blank by pressing **Enter** twice.
+For unattended/passwordless SSH on a lab-controlled computer, press
+**Enter twice** to leave the key passphrase blank.
 
-Verify the files were created:
-
-``` powershell
-Get-ChildItem $env:USERPROFILE\.ssh
-```
-
-You should now have:
+Do not share the private key:
 
 ``` text
 id_ed25519
+```
+
+The public key is:
+
+``` text
 id_ed25519.pub
 ```
 
-> **Security:** `id_ed25519` is your **private SSH key**. Never email
-> it, upload it, or share it. `id_ed25519.pub` is the public key and is
-> the file installed on ACCRE.
-
-### 3.3 Install Your Public Key on ACCRE
-
-From Windows PowerShell:
+### 3.3 Install the public key on ACCRE
 
 ``` powershell
 Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub | ssh YOUR_VUNET_ID@login.accre.vu "umask 077; mkdir -p ~/.ssh; cat >> ~/.ssh/authorized_keys"
 ```
 
-Enter your Vanderbilt password when prompted.
-
-Now test:
+Example:
 
 ``` powershell
-ssh YOUR_VUNET_ID@login.accre.vu
+Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub | ssh woodsdp@login.accre.vu "umask 077; mkdir -p ~/.ssh; cat >> ~/.ssh/authorized_keys"
 ```
 
-If everything worked, ACCRE should log you in **without asking for your
-Vanderbilt password**.
+Enter your Vanderbilt password when prompted.
 
-Exit ACCRE:
+Test the key explicitly:
+
+``` powershell
+ssh -i $env:USERPROFILE\.ssh\id_ed25519 -o IdentitiesOnly=yes YOUR_VUNET_ID@login.accre.vu
+```
+
+It should connect without asking for your password.
+
+Then:
 
 ``` bash
 exit
 ```
 
+> **For multiple lab computers:** generate a separate SSH key on each
+> computer. Do not copy one private key to every machine. Separate keys
+> can be revoked independently.
+
 ------------------------------------------------------------------------
 
-## 4. Create an Easy `ssh accre` Shortcut
+## 4. Create the `ssh accre` shortcut
 
-Instead of typing the complete hostname every time, configure:
-
-``` powershell
-ssh accre
-```
-
-In Windows PowerShell:
+Open the SSH config:
 
 ``` powershell
 notepad $env:USERPROFILE\.ssh\config
 ```
-
-If Notepad asks whether to create a new file, select **Yes**.
 
 Paste:
 
@@ -241,505 +179,638 @@ Host accre
     IdentitiesOnly yes
 ```
 
-Replace `YOUR_VUNET_ID` and `YOUR_WINDOWS_USERNAME` with your own
-information.
+Example for ACCRE user `woodsdp` on Windows user `gonza`:
+
+``` text
+Host accre
+    HostName login.accre.vu
+    User woodsdp
+    IdentityFile C:/Users/gonza/.ssh/id_ed25519
+    IdentitiesOnly yes
+```
 
 Save and close Notepad.
 
-### 4.1 Make Sure the File Is Named `config`
-
-Notepad may save the file as `config.txt`.
-
-Check:
+### Important: check for `config.txt`
 
 ``` powershell
 Get-ChildItem $env:USERPROFILE\.ssh -Force
 ```
 
-You want:
-
-``` text
-config
-```
-
-not:
-
-``` text
-config.txt
-```
-
-If necessary:
+If Notepad created `config.txt`, rename it:
 
 ``` powershell
 Rename-Item "$env:USERPROFILE\.ssh\config.txt" "config"
 ```
 
-### 4.2 Verify the Configuration
-
-Run:
+Verify the configuration:
 
 ``` powershell
 ssh -G accre | Select-String "hostname|user|identityfile"
 ```
 
-The output should contain your information, for example:
-
-``` text
-user YOUR_VUNET_ID
-hostname login.accre.vu
-identityfile C:/Users/YOUR_WINDOWS_USERNAME/.ssh/id_ed25519
-```
-
-Now test:
+Then test:
 
 ``` powershell
 ssh accre
 ```
 
-You should connect to ACCRE without entering a password.
+It should connect without asking for a password.
 
-From now on, terminal access is simply:
-
-``` powershell
-ssh accre
-```
-
-------------------------------------------------------------------------
-
-## 5. Install Software for Windows Drive Access
-
-To make the new ACCRE `/data` storage behave similarly to a Windows
-network drive, mount it over SSH using **SSHFS-Win**.
-
-Two components are required:
-
-1.  **WinFsp**
-2.  **SSHFS-Win**
-
-Install WinFsp first.
-
-### WinFsp
-
-Official releases:
-
-<https://github.com/winfsp/winfsp/releases/latest>
-
-Download the current 64-bit `.msi` installer and use the default
-installation options.
-
-### SSHFS-Win
-
-Official releases:
-
-<https://github.com/winfsp/sshfs-win/releases/latest>
-
-Download the current 64-bit `.msi` installer and use the default
-installation options.
-
-------------------------------------------------------------------------
-
-## 6. Decide What You Want to Mount
-
-The entire Gonzales Lab storage is:
-
-``` text
-/data/gonzales_lab
-```
-
-An individual directory may be:
-
-``` text
-/data/gonzales_lab/YOUR_FOLDER
-```
-
-A specific project may be:
-
-``` text
-/data/gonzales_lab/YOUR_FOLDER/PROJECT_FOLDER
-```
-
-Mounting only the directory you commonly use keeps the Windows drive
-cleaner.
-
-------------------------------------------------------------------------
-
-## 7. Mount ACCRE as a Windows Drive
-
-Open **Windows PowerShell**.
-
-Choose an unused drive letter. The examples below use `Z:`.
-
-To mount your directory:
-
-``` powershell
-net use Z: "\\sshfs.kr\YOUR_VUNET_ID@accre\data\gonzales_lab\YOUR_FOLDER"
-```
-
-For example:
-
-``` powershell
-net use Z: "\\sshfs.kr\woodsdp@accre\data\gonzales_lab\woodsdp"
-```
-
-If successful, Windows should report:
-
-``` text
-The command completed successfully.
-```
-
-Open:
-
-**File Explorer → This PC → Z:**
-
-The contents should correspond to:
-
-``` text
-/data/gonzales_lab/YOUR_FOLDER
-```
-
-on ACCRE.
-
-### Mount a Specific Project Instead
-
-To make a project itself become `Z:\`:
-
-``` powershell
-net use Z: "\\sshfs.kr\YOUR_VUNET_ID@accre\data\gonzales_lab\YOUR_FOLDER\PROJECT_FOLDER"
-```
-
-For example:
-
-``` powershell
-net use Z: "\\sshfs.kr\woodsdp@accre\data\gonzales_lab\woodsdp\FlexNHP"
-```
-
-Then `Z:\` corresponds directly to:
-
-``` text
-/data/gonzales_lab/woodsdp/FlexNHP
-```
-
-------------------------------------------------------------------------
-
-## 8. Verify the Windows Drive
-
-In Windows PowerShell:
-
-``` powershell
-Get-ChildItem Z:\
-```
-
-You should see the same files that appear on ACCRE.
-
-Once mounted, normal Windows applications can use paths such as:
-
-``` text
-Z:\results\analysis.mat
-```
-
-For example, MATLAB:
-
-``` matlab
-load('Z:\results\analysis.mat')
-```
-
-Python, VS Code, File Explorer, and other Windows applications can
-similarly access the mounted drive.
-
-------------------------------------------------------------------------
-
-## 9. Disconnect or Remount the Drive
-
-View currently mapped drives:
-
-``` powershell
-net use
-```
-
-Disconnect `Z:`:
-
-``` powershell
-net use Z: /delete
-```
-
-Reconnect later:
-
-``` powershell
-net use Z: "\\sshfs.kr\YOUR_VUNET_ID@accre\data\gonzales_lab\YOUR_FOLDER"
-```
-
-If `Z:` is already occupied, choose another drive letter:
-
-``` powershell
-net use Y: "\\sshfs.kr\YOUR_VUNET_ID@accre\data\gonzales_lab\YOUR_FOLDER"
-```
-
-------------------------------------------------------------------------
-
-## 10. Access ACCRE Without Mounting a Drive
-
-For quick command-line access:
-
-``` powershell
-ssh accre
-```
-
-Then:
-
-``` bash
-cd /data/gonzales_lab
-```
-
-or:
-
-``` bash
-cd /data/gonzales_lab/YOUR_FOLDER
-```
-
-List files:
-
-``` bash
-ls -lah
-```
-
-Disconnect:
+Exit:
 
 ``` bash
 exit
 ```
 
+> `ssh accre` working proves that OpenSSH and the SSH key work. It does
+> **not** by itself prove that the Windows SSHFS network-drive provider
+> is working.
+
 ------------------------------------------------------------------------
 
-## 11. Browser-Only Access
+## 5. Install WinFsp and SSHFS-Win
 
-If you are away from your normal workstation or do not want to install
-anything:
+The Windows drive mount uses **WinFsp + SSHFS-Win**.
 
-<https://viz.accre.vu>
+Install in this order:
 
-Log in with your Vanderbilt credentials.
+1.  WinFsp x64: https://github.com/winfsp/winfsp/releases/latest
+2.  SSHFS-Win x64: https://github.com/winfsp/sshfs-win/releases/latest
+3.  Restart Windows.
 
-For terminal access:
+After restarting, open PowerShell as Administrator.
+
+Verify WinFsp:
+
+``` powershell
+Get-Service WinFsp.Launcher
+```
+
+It should be `Running`.
+
+If necessary:
+
+``` powershell
+Set-Service WinFsp.Launcher -StartupType Automatic
+Start-Service WinFsp.Launcher
+```
+
+Verify SSHFS-Win:
+
+``` powershell
+Test-Path "C:\Program Files\SSHFS-Win\bin\sshfs.exe"
+```
+
+Expected:
+
+``` text
+True
+```
+
+------------------------------------------------------------------------
+
+## 6. Test SSHFS before mapping the lab directory
+
+This test was useful for diagnosing **System error 67**.
+
+First remove any stale mapping for the desired drive letter:
+
+``` powershell
+net use Z: /delete
+```
+
+It is harmless if Windows says the mapping does not exist.
+
+Check existing mappings:
+
+``` powershell
+net use
+```
+
+Now test the SSHFS provider using only the ACCRE host:
+
+``` powershell
+net use Z: "\\sshfs.r\YOUR_VUNET_ID@login.accre.vu"
+```
+
+Example:
+
+``` powershell
+net use Z: "\\sshfs.r\woodsdp@login.accre.vu"
+```
+
+If this succeeds, WinFsp/SSHFS-Win is working.
+
+Remove the temporary test:
+
+``` powershell
+net use Z: /delete
+```
+
+### If the test gives `System error 67`
+
+If:
+
+``` powershell
+ssh accre
+```
+
+works, but:
+
+``` powershell
+net use Z: "\\sshfs.r\YOUR_VUNET_ID@login.accre.vu"
+```
+
+returns:
+
+``` text
+System error 67 has occurred.
+The network name cannot be found.
+```
+
+then the problem is **not the ACCRE SSH account or the drive letter**.
+It is likely the local WinFsp/SSHFS-Win provider.
+
+Check:
+
+``` powershell
+Get-Service WinFsp.Launcher
+```
+
+``` powershell
+Test-Path "C:\Program Files\SSHFS-Win\bin\sshfs.exe"
+```
+
+If necessary, uninstall SSHFS-Win and WinFsp, restart, install **WinFsp
+first**, install **SSHFS-Win second**, restart again, and repeat the
+simple `\\sshfs.r\...` test.
+
+Changing from `Y:` to `Z:` will not fix Error 67 if the SSHFS provider
+itself is failing.
+
+------------------------------------------------------------------------
+
+## 7. Map the Gonzales Lab storage
+
+The entire lab directory is:
+
+``` text
+/data/gonzales_lab
+```
+
+Because this is an absolute Linux path, use the `.r` SSHFS-Win form and
+the **full hostname**:
+
+``` text
+\\sshfs.r\YOUR_VUNET_ID@login.accre.vu\data\gonzales_lab
+```
+
+### Recommended tested mapping
+
+``` powershell
+net use Z: "\\sshfs.r\YOUR_VUNET_ID@login.accre.vu\data\gonzales_lab" /persistent:yes
+```
+
+Example:
+
+``` powershell
+net use Z: "\\sshfs.r\woodsdp@login.accre.vu\data\gonzales_lab" /persistent:yes
+```
+
+If prompted, enter the ACCRE/Vanderbilt username and password.
+
+Verify:
+
+``` powershell
+Get-ChildItem Z:\
+```
+
+You should see the top-level contents of:
+
+``` text
+/data/gonzales_lab
+```
+
+Check the mapping:
+
+``` powershell
+net use
+```
+
+> **Important lesson from testing:** use the full hostname
+> `login.accre.vu` in the SSHFS UNC path. The OpenSSH alias `accre` may
+> work perfectly with `ssh accre` while the Windows SSHFS mapping
+> behaves differently.
+
+------------------------------------------------------------------------
+
+## 8. Make credential storage persistent
+
+`/persistent:yes` tells Windows to remember the **drive mapping**, but
+the authentication must also survive logout/restart.
+
+Inspect stored SSHFS credentials:
+
+``` powershell
+cmdkey /list | Select-String "sshfs" -Context 2,4
+```
+
+For a fully persistent setup, look for an SSHFS credential resembling:
+
+``` text
+Target: LegacyGeneric:target=\\sshfs.r\YOUR_VUNET_ID@login.accre.vu\data\gonzales_lab
+Type: Generic
+User: YOUR_VUNET_ID
+Local machine persistence
+```
+
+The important line is:
+
+``` text
+Local machine persistence
+```
+
+### If the credential is not stored persistently
+
+Disconnect:
+
+``` powershell
+net use Z: /delete
+```
+
+Then use:
+
+**File Explorer → This PC → ... → Map network drive**
+
+Set:
+
+``` text
+Drive: Z:
+Folder: \\sshfs.r\YOUR_VUNET_ID@login.accre.vu\data\gonzales_lab
+```
+
+Check:
+
+``` text
+Reconnect at sign-in
+Connect using different credentials
+```
+
+When Windows asks for the SSHFS credentials, enter the ACCRE/Vanderbilt
+username and password and select:
+
+``` text
+Remember my credentials
+```
+
+Then re-check:
+
+``` powershell
+cmdkey /list | Select-String "sshfs" -Context 2,4
+```
+
+Do not consider a shared/lab workstation fully configured for unattended
+restart recovery until the credential shows **Local machine
+persistence** and the reboot test below succeeds.
+
+------------------------------------------------------------------------
+
+## 9. Create an ACCRE Desktop `.cmd` launcher
+
+After the persistent `Z:` mapping is working, create a small `.cmd` file
+on the Desktop. This gives users a simple **ACCRE - Gonzales Lab** item
+to double-click.
+
+The launcher should open the **mapped `Z:` drive**, not the raw SSHFS
+UNC path. During testing, sending the raw network path directly to
+Explorer sometimes caused Windows to open Documents/OneDrive instead of
+ACCRE.
+
+### Recommended method: Notepad
+
+Open **Notepad** and paste:
+
+``` bat
+@echo off
+start "" explorer.exe Z:\
+exit
+```
+
+Choose **File → Save As** and use:
+
+``` text
+File name: ACCRE - Gonzales Lab.cmd
+Save as type: All Files (*.*)
+Location: Desktop
+```
+
+Make sure the filename ends in `.cmd`, not `.cmd.txt`.
+
+Double-click **ACCRE - Gonzales Lab.cmd**. File Explorer should open:
+
+``` text
+Z:\
+```
+
+With the recommended mapping in this guide, that is:
+
+``` text
+/data/gonzales_lab
+```
+
+### Faster PowerShell method
+
+``` powershell
+@'
+@echo off
+start "" explorer.exe Z:\
+exit
+'@ | Set-Content "$env:USERPROFILE\Desktop\ACCRE - Gonzales Lab.cmd" -Encoding ASCII
+```
+
+Then double-click **ACCRE - Gonzales Lab.cmd** on the Desktop.
+
+> **Important:** the `.cmd` does not establish the SSHFS connection or
+> make the mapping persistent. It only opens `Z:\`. Complete the
+> persistent mapping and credential-storage steps first. After a reboot,
+> `Z:` should reconnect independently and the `.cmd` simply opens it.
+
+## 10. Mandatory restart/power-cycle test
+
+A successful mapping during the setup session is **not enough** to prove
+persistence.
+
+Restart the computer normally.
+
+After logging back into the same Windows account, run:
+
+``` powershell
+net use
+```
+
+Then:
+
+``` powershell
+Get-ChildItem Z:\
+```
+
+Then double-click:
+
+``` text
+ACCRE - Gonzales Lab
+```
+
+Finally check:
+
+``` powershell
+cmdkey /list | Select-String "sshfs" -Context 2,4
+```
+
+The setup passes only if:
+
+``` text
+Z: still exists
+Z:\ opens successfully
+/data/gonzales_lab contents are visible
+No password is requested
+The desktop shortcut opens Z:\
+The SSHFS credential remains locally persistent
+```
+
+A complete shutdown/power-on test can also be performed after the
+restart test.
+
+------------------------------------------------------------------------
+
+## 11. Common problems and fixes
+
+### `ssh accre` works, but `Z:` is missing
+
+The SSH key/OpenSSH setup is working, but the SSHFS drive mapping did
+not reconnect.
+
+Check:
+
+``` powershell
+net use
+```
+
+Then test the provider:
+
+``` powershell
+net use Z: "\\sshfs.r\YOUR_VUNET_ID@login.accre.vu"
+```
+
+If that succeeds, remove it and recreate the full persistent mapping:
+
+``` powershell
+net use Z: /delete
+```
+
+``` powershell
+net use Z: "\\sshfs.r\YOUR_VUNET_ID@login.accre.vu\data\gonzales_lab" /persistent:yes
+```
+
+Then verify Credential Manager persistence and reboot again.
+
+### `System error 67: The network name cannot be found`
+
+Do not keep changing drive letters.
+
+First confirm:
+
+``` powershell
+ssh accre
+```
+
+Then:
+
+``` powershell
+Get-Service WinFsp.Launcher
+```
+
+Then:
+
+``` powershell
+Test-Path "C:\Program Files\SSHFS-Win\bin\sshfs.exe"
+```
+
+Then test:
+
+``` powershell
+net use Z: "\\sshfs.r\YOUR_VUNET_ID@login.accre.vu"
+```
+
+If SSH works but the simple SSHFS mapping still returns Error 67,
+repair/reinstall WinFsp + SSHFS-Win.
+
+### Desktop shortcut opens Documents/OneDrive instead of ACCRE
+
+Do not make the desktop shortcut responsible for opening the raw SSHFS
+UNC path.
+
+First make sure:
+
+``` powershell
+Get-ChildItem Z:\
+```
+
+works.
+
+Then point the shortcut to:
+
+``` text
+Z:\
+```
+
+or:
+
+``` text
+explorer.exe Z:\
+```
+
+### `Z:` says the location cannot be found after reboot
+
+Check:
+
+``` powershell
+net use
+```
+
+and:
+
+``` powershell
+cmdkey /list | Select-String "sshfs" -Context 2,4
+```
+
+The drive mapping and its credential are separate pieces.
+`/persistent:yes` alone does not guarantee that the authentication
+credential was saved for future logons.
+
+### Drive letter is already in use
+
+Check:
+
+``` powershell
+net use
+```
+
+Remove an old mapping if appropriate:
+
+``` powershell
+net use Z: /delete
+```
+
+Then remap.
+
+------------------------------------------------------------------------
+
+## 12. Browser-only access
+
+If you do not want to install WinFsp/SSHFS-Win:
+
+https://viz.accre.vu
+
+Use:
+
+**Files → Home Directory**
+
+for browser-based file operations, or:
 
 **Clusters → ACCRE Shell Access**
 
-Then:
+for a terminal.
+
+From the terminal:
 
 ``` bash
 cd /data/gonzales_lab
 ```
 
-The Visualization Portal can also be used for graphical file access.
-
 ------------------------------------------------------------------------
 
-## 12. Troubleshooting
+## 13. Tested quick-start checklist
 
-### `ssh` Asks for Your Vanderbilt Password Every Time
-
-Test:
+For a Windows computer that should mount the **entire Gonzales Lab
+directory**:
 
 ``` powershell
 ssh YOUR_VUNET_ID@login.accre.vu
 ```
 
-If it still requires a password, reinstall your public key:
+``` powershell
+ssh-keygen -t ed25519
+```
 
 ``` powershell
 Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub | ssh YOUR_VUNET_ID@login.accre.vu "umask 077; mkdir -p ~/.ssh; cat >> ~/.ssh/authorized_keys"
 ```
 
-Then test again.
-
-### `ssh accre` Uses the Wrong Username
-
-Check:
-
-``` powershell
-ssh -G accre | Select-String "hostname|user|identityfile"
-```
-
-Verify that it reports:
+Create `%USERPROFILE%\.ssh\config`:
 
 ``` text
-user YOUR_VUNET_ID
-hostname login.accre.vu
+Host accre
+    HostName login.accre.vu
+    User YOUR_VUNET_ID
+    IdentityFile C:/Users/YOUR_WINDOWS_USERNAME/.ssh/id_ed25519
+    IdentitiesOnly yes
 ```
 
-If it reports a Windows/domain username instead, make sure the SSH
-configuration is actually named:
-
-``` text
-config
-```
-
-and not:
-
-``` text
-config.txt
-```
-
-Check with:
-
-``` powershell
-Get-ChildItem $env:USERPROFILE\.ssh -Force
-```
-
-### A Windows Command Says `command not found`
-
-Make sure you are running Windows commands from **Windows PowerShell**,
-not from the ACCRE Linux terminal.
-
-A Windows prompt resembles:
-
-``` text
-PS C:\Users\YOUR_USERNAME>
-```
-
-An ACCRE prompt resembles:
-
-``` text
-[YOUR_USERNAME@gw02 ~]$
-```
-
-### `/data/gonzales_lab` Gives `Permission denied`
-
-Your account likely needs to be added to the Gonzales Lab ACCRE group.
-
-Contact the lab administrator/PI or ACCRE support rather than attempting
-to change the group directory permissions yourself.
-
-### Windows Says the Drive Letter Is Already in Use
-
-Check:
-
-``` powershell
-net use
-```
-
-If appropriate, remove an old mapping:
-
-``` powershell
-net use Z: /delete
-```
-
-Then retry.
-
-### Windows Network-Drive Login Rejects Your Vanderbilt Password
-
-Complete the **SSH key + SSH config** setup first and use the key-based
-SSHFS mount:
-
-``` powershell
-net use Z: "\\sshfs.kr\YOUR_VUNET_ID@accre\data\gonzales_lab\YOUR_FOLDER"
-```
-
-------------------------------------------------------------------------
-
-## 13. Performance Notes
-
-The mounted Windows drive is convenient, but it accesses ACCRE over the
-network through SSH.
-
-It is well suited for:
-
--   Browsing directories
--   Opening scripts
--   Editing code
--   Viewing results
--   Copying individual or moderate-sized files
--   Accessing files from MATLAB/Python
--   General day-to-day file management
-
-Do not assume the SSHFS drive will perform like a local SSD or direct
-storage access from an ACCRE compute node.
-
-For very large datasets, sustained high-throughput reads/writes, or
-computationally intensive analyses, it is generally preferable to run
-the analysis directly on ACCRE.
-
-------------------------------------------------------------------------
-
-# Quick Reference
-
-### Lab storage
-
-``` text
-/data/gonzales_lab
-```
-
-### ACCRE web portal
-
-<https://viz.accre.vu>
-
-### Connect manually
-
-``` powershell
-ssh YOUR_VUNET_ID@login.accre.vu
-```
-
-### Connect after SSH setup
+Test:
 
 ``` powershell
 ssh accre
 ```
 
-### Go to lab storage
+Install **WinFsp**, then **SSHFS-Win**, then restart.
 
-``` bash
-cd /data/gonzales_lab
-```
-
-### Check lab storage
-
-``` bash
-ls -lah /data/gonzales_lab
-```
-
-### Check SSH configuration
+Test the SSHFS provider:
 
 ``` powershell
-ssh -G accre | Select-String "hostname|user|identityfile"
+net use Z: "\\sshfs.r\YOUR_VUNET_ID@login.accre.vu"
 ```
 
-### Mount your ACCRE directory as `Z:`
+Remove the test:
 
 ``` powershell
-net use Z: "\\sshfs.kr\YOUR_VUNET_ID@accre\data\gonzales_lab\YOUR_FOLDER"
+net use Z: /delete
 ```
 
-### View the mounted drive
+Create the real persistent mapping:
+
+``` powershell
+net use Z: "\\sshfs.r\YOUR_VUNET_ID@login.accre.vu\data\gonzales_lab" /persistent:yes
+```
+
+Verify:
 
 ``` powershell
 Get-ChildItem Z:\
 ```
 
-### Disconnect the drive
+Check credential persistence:
 
 ``` powershell
-net use Z: /delete
+cmdkey /list | Select-String "sshfs" -Context 2,4
 ```
 
-### Exit ACCRE
-
-``` bash
-exit
-```
-
-------------------------------------------------------------------------
-
-## Final Setup
-
-Once configured, normal terminal access is:
-
-``` powershell
-ssh accre
-```
-
-and normal file access is:
+Create the desktop shortcut to:
 
 ``` text
-File Explorer → This PC → Z:
+Z:\
 ```
 
-Both provide access to the Gonzales Lab's new ACCRE `/data` storage.
+Restart Windows and repeat:
+
+``` powershell
+net use
+```
+
+``` powershell
+Get-ChildItem Z:\
+```
+
+If `Z:` survives the restart, opens without a password, shows the lab
+files, and the SSHFS credential reports **Local machine persistence**,
+the Windows ACCRE setup is complete.
