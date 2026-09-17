@@ -9,7 +9,9 @@ useful during setup.
 > **Lab storage:** `/data/gonzales_lab`\
 > **Underlying ACCRE path:** `/v5000/data/gonzales_lab`\
 > **Recommended Windows mount:**
-> `\\sshfs.r\YOUR_VUNET_ID@login.accre.vu\data\gonzales_lab`
+> `\\sshfs.r\YOUR_VUNET_ID@login.accre.vu`
+>
+> **Gonzales Lab folder in Windows:** `Z:\data\gonzales_lab`
 
 For normal use, use `/data/gonzales_lab`.
 
@@ -270,236 +272,193 @@ True
 
 ------------------------------------------------------------------------
 
-## 6. Test SSHFS before mapping the lab directory
+## 6. Test SSHFS before creating the persistent mount
 
-This test was useful for diagnosing **System error 67**.
+This simple root mount is both the best SSHFS provider test and the **recommended final mapping**.
 
 First remove any stale mapping for the desired drive letter:
 
-``` powershell
+```powershell
 net use Z: /delete
 ```
 
-It is harmless if Windows says the mapping does not exist.
+It is harmless if Windows says the mapping does not exist. Check existing mappings with:
 
-Check existing mappings:
-
-``` powershell
+```powershell
 net use
 ```
 
-Now test the SSHFS provider using only the ACCRE host:
+Now mount the ACCRE filesystem root:
 
-``` powershell
+```powershell
 net use Z: "\\sshfs.r\YOUR_VUNET_ID@login.accre.vu"
 ```
 
 Example:
 
-``` powershell
+```powershell
 net use Z: "\\sshfs.r\woodsdp@login.accre.vu"
 ```
 
-If this succeeds, WinFsp/SSHFS-Win is working.
+If prompted, enter your ACCRE/Vanderbilt username and password. If this succeeds, WinFsp/SSHFS-Win is working and `Z:\` represents the Linux filesystem root `/` on ACCRE.
 
-Remove the temporary test:
+Verify:
 
-``` powershell
-net use Z: /delete
+```powershell
+Get-ChildItem Z:\
 ```
 
-### If the test gives `System error 67`
+You should see ACCRE directories such as `data`, `home`, `v5000`, and others.
 
-If:
+### If the root test gives `System error 67`
 
-``` powershell
-ssh accre
-```
+If `ssh accre` works but the root SSHFS mapping returns:
 
-works, but:
-
-``` powershell
-net use Z: "\\sshfs.r\YOUR_VUNET_ID@login.accre.vu"
-```
-
-returns:
-
-``` text
+```text
 System error 67 has occurred.
 The network name cannot be found.
 ```
 
-then the problem is **not the ACCRE SSH account or the drive letter**.
-It is likely the local WinFsp/SSHFS-Win provider.
+then the problem is not the ACCRE SSH account or drive letter. Check:
 
-Check:
-
-``` powershell
+```powershell
 Get-Service WinFsp.Launcher
-```
-
-``` powershell
 Test-Path "C:\Program Files\SSHFS-Win\bin\sshfs.exe"
 ```
 
-If necessary, uninstall SSHFS-Win and WinFsp, restart, install **WinFsp
-first**, install **SSHFS-Win second**, restart again, and repeat the
-simple `\\sshfs.r\...` test.
-
-Changing from `Y:` to `Z:` will not fix Error 67 if the SSHFS provider
-itself is failing.
+If necessary, uninstall SSHFS-Win and WinFsp, restart, install **WinFsp first**, install **SSHFS-Win second**, restart again, and repeat the root mount test. Changing from `Y:` to `Z:` will not fix Error 67 if the SSHFS provider itself is failing.
 
 ------------------------------------------------------------------------
 
-## 7. Map the Gonzales Lab storage
+## 7. Make the ACCRE root mount persistent
 
-The entire lab directory is:
+The Gonzales Lab storage itself is:
 
-``` text
+```text
 /data/gonzales_lab
 ```
 
-Because this is an absolute Linux path, use the `.r` SSHFS-Win form and
-the **full hostname**:
+However, **do not directly map that deep path as the Windows network drive**. During testing, this command authenticated but repeatedly failed with `System error 67`:
 
-``` text
-\\sshfs.r\YOUR_VUNET_ID@login.accre.vu\data\gonzales_lab
+```powershell
+net use Z: "\\sshfs.r\YOUR_VUNET_ID@login.accre.vu\data\gonzales_lab" /persistent:yes
 ```
 
-### Recommended tested mapping
+Changing the drive letter did not fix it. The more robust approach is to map the ACCRE filesystem root and then navigate to the lab directory inside that mounted drive.
 
-``` powershell
-net use Z: "\\sshfs.r\YOUR_VUNET_ID@login.accre.vu\data\gonzales_lab" /persistent:yes
+If the temporary root test from Section 6 is still mounted, remove it:
+
+```powershell
+net use Z: /delete
+```
+
+Create the persistent root mapping:
+
+```powershell
+net use Z: "\\sshfs.r\YOUR_VUNET_ID@login.accre.vu" /persistent:yes
 ```
 
 Example:
 
-``` powershell
-net use Z: "\\sshfs.r\woodsdp@login.accre.vu\data\gonzales_lab" /persistent:yes
+```powershell
+net use Z: "\\sshfs.r\woodsdp@login.accre.vu" /persistent:yes
 ```
 
-If prompted, enter the ACCRE/Vanderbilt username and password.
+If prompted, enter your ACCRE/Vanderbilt username and password.
 
-Verify:
+The mapping is now:
 
-``` powershell
-Get-ChildItem Z:\
+```text
+Z:\                       = ACCRE Linux root /
+Z:\data\gonzales_lab     = /data/gonzales_lab
 ```
 
-You should see the top-level contents of:
+Verify the actual lab storage directly:
 
-``` text
-/data/gonzales_lab
+```powershell
+Get-ChildItem Z:\data\gonzales_lab
 ```
 
-Check the mapping:
+You should see the Gonzales Lab directories. It is normal for `Z:\` itself to contain many Linux system directories; lab users do not need to interact with them.
 
-``` powershell
+Check that Windows remembers the mapping:
+
+```powershell
 net use
 ```
 
-> **Important lesson from testing:** use the full hostname
-> `login.accre.vu` in the SSHFS UNC path. The OpenSSH alias `accre` may
-> work perfectly with `ssh accre` while the Windows SSHFS mapping
-> behaves differently.
+> **Why this layout?** SSHFS-Win reliably mounted `\\sshfs.r\USER@login.accre.vu`, while direct mapping of the deeper `...\data\gonzales_lab` path produced Error 67 on a tested machine. Mounting the root avoids that failure, and the desktop launcher in Section 9 takes users directly to the lab folder.
 
 ------------------------------------------------------------------------
 
 ## 8. Make credential storage persistent
 
-`/persistent:yes` tells Windows to remember the **drive mapping**, but
-the authentication must also survive logout/restart.
+`/persistent:yes` tells Windows to remember the **drive mapping**, but authentication must also survive logout/restart.
 
 Inspect stored SSHFS credentials:
 
-``` powershell
+```powershell
 cmdkey /list | Select-String "sshfs" -Context 2,4
 ```
 
-For a fully persistent setup, look for an SSHFS credential resembling:
+For this root-mount configuration, look for an SSHFS credential corresponding to:
 
-``` text
-Target: LegacyGeneric:target=\\sshfs.r\YOUR_VUNET_ID@login.accre.vu\data\gonzales_lab
-Type: Generic
-User: YOUR_VUNET_ID
-Local machine persistence
+```text
+\\sshfs.r\YOUR_VUNET_ID@login.accre.vu
 ```
 
-The important line is:
-
-``` text
-Local machine persistence
-```
+The important result is that the credential is retained for future logons (for example, Credential Manager may show **Local machine persistence**).
 
 ### If the credential is not stored persistently
 
 Disconnect:
 
-``` powershell
+```powershell
 net use Z: /delete
 ```
 
-Then use:
+Then use **File Explorer → This PC → ... → Map network drive** and set:
 
-**File Explorer → This PC → ... → Map network drive**
-
-Set:
-
-``` text
+```text
 Drive: Z:
-Folder: \\sshfs.r\YOUR_VUNET_ID@login.accre.vu\data\gonzales_lab
+Folder: \\sshfs.r\YOUR_VUNET_ID@login.accre.vu
 ```
 
-Check:
-
-``` text
-Reconnect at sign-in
-Connect using different credentials
-```
-
-When Windows asks for the SSHFS credentials, enter the ACCRE/Vanderbilt
-username and password and select:
-
-``` text
-Remember my credentials
-```
+Check **Reconnect at sign-in** and **Connect using different credentials**. Enter the ACCRE/Vanderbilt username and password and select **Remember my credentials**.
 
 Then re-check:
 
-``` powershell
+```powershell
 cmdkey /list | Select-String "sshfs" -Context 2,4
 ```
 
-Do not consider a shared/lab workstation fully configured for unattended
-restart recovery until the credential shows **Local machine
-persistence** and the reboot test below succeeds.
+Do not consider a shared/lab workstation fully configured for unattended restart recovery until the reboot test below succeeds without another password prompt.
 
 ------------------------------------------------------------------------
 
-## 9. Create an ACCRE Desktop `.cmd` launcher
+## 9. Create the Gonzales Lab Desktop `.cmd` launcher
 
-After the persistent `Z:` mapping is working, create a small `.cmd` file
-on the Desktop. This gives users a simple **ACCRE - Gonzales Lab** item
-to double-click.
+Because `Z:\` is intentionally the ACCRE filesystem root, the desktop launcher should take users **directly to the Gonzales Lab directory**:
 
-The launcher should open the **mapped `Z:` drive**, not the raw SSHFS
-UNC path. During testing, sending the raw network path directly to
-Explorer sometimes caused Windows to open Documents/OneDrive instead of
-ACCRE.
+```text
+Z:\data\gonzales_lab
+```
+
+This keeps normal use simple even though the underlying drive contains the full ACCRE filesystem.
 
 ### Recommended method: Notepad
 
 Open **Notepad** and paste:
 
-``` bat
+```bat
 @echo off
-start "" explorer.exe Z:\
+start "" explorer.exe "Z:\data\gonzales_lab"
 exit
 ```
 
 Choose **File → Save As** and use:
 
-``` text
+```text
 File name: ACCRE - Gonzales Lab.cmd
 Save as type: All Files (*.*)
 Location: Desktop
@@ -507,34 +466,21 @@ Location: Desktop
 
 Make sure the filename ends in `.cmd`, not `.cmd.txt`.
 
-Double-click **ACCRE - Gonzales Lab.cmd**. File Explorer should open:
-
-``` text
-Z:\
-```
-
-With the recommended mapping in this guide, that is:
-
-``` text
-/data/gonzales_lab
-```
+Double-click **ACCRE - Gonzales Lab.cmd**. File Explorer should open directly to the lab storage at `Z:\data\gonzales_lab`.
 
 ### Faster PowerShell method
 
-``` powershell
+```powershell
 @'
 @echo off
-start "" explorer.exe Z:\
+start "" explorer.exe "Z:\data\gonzales_lab"
 exit
 '@ | Set-Content "$env:USERPROFILE\Desktop\ACCRE - Gonzales Lab.cmd" -Encoding ASCII
 ```
 
-Then double-click **ACCRE - Gonzales Lab.cmd** on the Desktop.
+> **Important:** the `.cmd` does not establish the SSHFS connection or make the mapping persistent. It only opens the lab folder inside the already-mounted `Z:` drive.
 
-> **Important:** the `.cmd` does not establish the SSHFS connection or
-> make the mapping persistent. It only opens `Z:\`. Complete the
-> persistent mapping and credential-storage steps first. After a reboot,
-> `Z:` should reconnect independently and the `.cmd` simply opens it.
+------------------------------------------------------------------------
 
 ## 10. Mandatory restart/power-cycle test
 
@@ -574,7 +520,7 @@ Z: still exists
 Z:\ opens successfully
 /data/gonzales_lab contents are visible
 No password is requested
-The desktop shortcut opens Z:\
+The desktop launcher opens Z:\data\gonzales_lab
 The SSHFS credential remains locally persistent
 ```
 
@@ -609,7 +555,7 @@ net use Z: /delete
 ```
 
 ``` powershell
-net use Z: "\\sshfs.r\YOUR_VUNET_ID@login.accre.vu\data\gonzales_lab" /persistent:yes
+net use Z: "\\sshfs.r\YOUR_VUNET_ID@login.accre.vu" /persistent:yes
 ```
 
 Then verify Credential Manager persistence and reboot again.
@@ -653,21 +599,15 @@ UNC path.
 First make sure:
 
 ``` powershell
-Get-ChildItem Z:\
+Get-ChildItem Z:\data\gonzales_lab
 ```
 
 works.
 
-Then point the shortcut to:
+Then make the launcher open:
 
-``` text
-Z:\
-```
-
-or:
-
-``` text
-explorer.exe Z:\
+```text
+Z:\data\gonzales_lab
 ```
 
 ### `Z:` says the location cannot be found after reboot
@@ -780,13 +720,13 @@ net use Z: /delete
 Create the real persistent mapping:
 
 ``` powershell
-net use Z: "\\sshfs.r\YOUR_VUNET_ID@login.accre.vu\data\gonzales_lab" /persistent:yes
+net use Z: "\\sshfs.r\YOUR_VUNET_ID@login.accre.vu" /persistent:yes
 ```
 
-Verify:
+Verify the Gonzales Lab directory:
 
 ``` powershell
-Get-ChildItem Z:\
+Get-ChildItem Z:\data\gonzales_lab
 ```
 
 Check credential persistence:
@@ -795,10 +735,12 @@ Check credential persistence:
 cmdkey /list | Select-String "sshfs" -Context 2,4
 ```
 
-Create the desktop shortcut to:
+Create the Desktop `.cmd` launcher:
 
-``` text
-Z:\
+```bat
+@echo off
+start "" explorer.exe "Z:\data\gonzales_lab"
+exit
 ```
 
 Restart Windows and repeat:
@@ -811,6 +753,4 @@ net use
 Get-ChildItem Z:\
 ```
 
-If `Z:` survives the restart, opens without a password, shows the lab
-files, and the SSHFS credential reports **Local machine persistence**,
-the Windows ACCRE setup is complete.
+If `Z:` survives the restart, `Z:\data\gonzales_lab` opens without a password, and the SSHFS credential reports **Local machine persistence**, the Windows ACCRE setup is complete.
